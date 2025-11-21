@@ -1,0 +1,14 @@
+version: '3.8'
+
+services:
+  movie-night:
+    build: .  # Oder das fertige Image, wenn wir es gebaut haben
+    container_name: movie-night
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./data:/app/data  # Hier liegt die SQLite DB, damit die Liste beim Neustart bleibt
+      - ./templates:/app/templates
+    env_file:
+      - .env

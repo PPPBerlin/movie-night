@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Film Abend Picker</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" />
+    <style>
+        /* Verhindert Zoomen auf Mobile beim Tippen */
+        body { touch-action: manipulation; }
+        .poster-card { transition: transform 0.2s; }
+        .poster-card:active { transform: scale(0.95); }
+        
+        /* Animation für den Winner */
+        @keyframes pop-in {
+            0% { transform: scale(0.5); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        .animate-pop { animation: pop-in 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+    </style>
+</head>
+<body class="bg-gray-900 text-white min-h-screen pb-24">
+
+    <div class="p-4 bg-gray-800 shadow-lg sticky top-0 z-10">
+        <h1 class="text-xl font-bold text-center text-yellow-500">🍿 Was gucken wir?</h1>
+    </div>
+
+    <div class="p-4 max-w-md mx-auto">
+        <div class="relative">
+            <input type="text" id="searchInput" placeholder="Film hinzufügen (z.B. Matrix)..." 
+                   class="w-full p-3 rounded-lg bg-gray-700 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-yellow-500">
+            <div id="searchResults" class="absolute w-full bg-gray-800 mt-1 rounded-lg shadow-xl z-20 hidden border border-gray-700"></div>
+        </div>
+    </div>
+
+    <div class="p-4 max-w-4xl mx-auto">
+        {% if not movies %}
+            <div class="text-center text-gray-500 mt-10">
+                <i class="fas fa-film text-4xl mb-2"></i>
+                <p>Noch keine Filme auf der Liste.</p>
+            </div>
+        {% endif %}
+
+        <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4" id="movieGrid">
+            {% for movie in movies %}
+            <div class="relative group poster-card bg-gray-800 rounded-xl overflow-hidden shadow-lg" data-title="{{ movie.title }}" data-poster="{{ movie.poster_path }}">
+                <img src="{{ movie.poster_path }}" class="w-full h-auto object-cover aspect-[2/3]" alt="{{ movie.title }}">
+                
+                <form action="/delete/{{ movie.id }}" method="post" class="absolute top-0 right-0 p-1 opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button type="submit" class="bg-red-600 text-white w-8 h-8 rounded-full flex items-center justify-center shadow-md hover:bg-red-700">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </form>
+                <div class="p-2 text-xs text-center truncate bg-gray-800">{{ movie.title }}</div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    {% if movies %}
+    <button onclick="startRoulette()" class="fixed bottom-6 right-6 bg-yellow-500 text-gray-900 w-16 h-16 rounded-full shadow-2xl flex items-center justify-center text-2xl hover:scale-110 transition-transform z-30">
+        <i class="fas fa-dice"></i>
+    </button>
+    {% endif %}
+
+    <div id="rouletteModal" class="fixed inset-0 bg-black/90 z-50 hidden flex flex-col items-center justify-center p-4">
+        <div id="rouletteContainer" class="text-center">
+            <img id="rouletteImage" src="" class="w-48 md:w-64 rounded-xl shadow-2xl border-4 border-yellow-500 mb-4 mx-auto">
+            <h2 id="rouletteTitle" class="text-2xl font-bold text-yellow-500 mb-6">Suche aus...</h2>
+            
+            <button id="closeModalBtn" onclick="closeModal()" class="hidden px-6 py-2 bg-gray-700 rounded-full text-white">Schließen</button>
+        </div>
+    </div>
+
+    <script>
+        // --- Suche Logik ---
+        const searchInput = document.getElementById('searchInput');
+        const resultsDiv = document.getElementById('searchResults');
+
+        let debounceTimer;
+        searchInput.addEventListener('input', (e) => {
+            clearTimeout(debounceTimer);
+            const query = e.target.value;
+            if (query.length < 3) { resultsDiv.classList.add('hidden'); return; }
+
+            debounceTimer = setTimeout(async () => {
+                const res = await fetch(`/api/search?query=${query}`);
+                const data = await res.json();
+                resultsDiv.innerHTML = '';
+                if (data.length > 0) {
+                    resultsDiv.classList.remove('hidden');
+                    data.forEach(movie => {
+                        const div = document.createElement('div');
+                        div.className = 'p-3 hover:bg-gray-700 cursor-pointer flex items-center gap-3 border-b border-gray-700 last:border-0';
+                        div.innerHTML = `<img src="${movie.poster_path}" class="w-10 h-14 object-cover rounded"> <span class="font-medium">${movie.title}</span>`;
+                        div.onclick = () => addMovie(movie);
+                        resultsDiv.appendChild(div);
+                    });
+                }
+            }, 300);
+        });
+
+        // Klick außerhalb schließt Suche
+        document.addEventListener('click', (e) => {
+            if (!searchInput.contains(e.target) && !resultsDiv.contains(e.target)) {
+                resultsDiv.classList.add('hidden');
+            }
+        });
+
+        function addMovie(movie) {
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = '/add';
+            
+            ['tmdb_id', 'title', 'poster_path'].forEach(field => {
+                const input = document.createElement('input');
+                input.type = 'hidden';
+                input.name = field;
+                input.value = movie[field];
+                form.appendChild(input);
+            });
+            document.body.appendChild(form);
+            form.submit();
+        }
+
+        // --- Roulette Animation Logik ---
+        const moviesData = [
+            {% for movie in movies %}
+            { title: "{{ movie.title }}", poster: "{{ movie.poster_path }}" },
+            {% endfor %}
+        ];
+
+        function startRoulette() {
+            const modal = document.getElementById('rouletteModal');
+            const img = document.getElementById('rouletteImage');
+            const title = document.getElementById('rouletteTitle');
+            const btn = document.getElementById('closeModalBtn');
+            
+            modal.classList.remove('hidden');
+            btn.classList.add('hidden');
+            title.innerText = "Zufallsgenerator läuft...";
+            
+            let speed = 50;
+            let counter = 0;
+            const maxSteps = 25 + Math.floor(Math.random() * 10); // Zufällige Länge
+            
+            const spin = () => {
+                // Wähle zufälligen Film für den Effekt
+                const randomMovie = moviesData[Math.floor(Math.random() * moviesData.length)];
+                img.src = randomMovie.poster;
+                
+                counter++;
+                
+                if (counter < maxSteps) {
+                    // Langsamer werden
+                    if (counter > maxSteps - 10) speed += 30;
+                    if (counter > maxSteps - 5) speed += 60;
+                    setTimeout(spin, speed);
+                } else {
+                    // FINALE!
+                    showWinner(randomMovie);
+                }
+            };
+            
+            spin();
+        }
+
+        function showWinner(movie) {
+            const img = document.getElementById('rouletteImage');
+            const title = document.getElementById('rouletteTitle');
+            const btn = document.getElementById('closeModalBtn');
+            
+            // Bild und Text setzen
+            img.src = movie.poster;
+            img.classList.add('animate-pop');
+            title.innerHTML = `Heute schauen wir:<br><span class="text-3xl text-white mt-2 block">${movie.title}</span>`;
+            btn.classList.remove('hidden');
+            
+            // --- KONFETTI START ---
+            var duration = 3 * 1000; // 3 Sekunden lang
+            var animationEnd = Date.now() + duration;
+            var defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 60 };
+
+            function randomInRange(min, max) {
+              return Math.random() * (max - min) + min;
+            }
+
+            var interval = setInterval(function() {
+              var timeLeft = animationEnd - Date.now();
+
+              if (timeLeft <= 0) {
+                return clearInterval(interval);
+              }
+
+              var particleCount = 50 * (timeLeft / duration);
+              
+              // Konfetti von links und rechts schießen
+              confetti(Object.assign({}, defaults, { particleCount, origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 } }));
+              confetti(Object.assign({}, defaults, { particleCount, origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 } }));
+            }, 250);
+            // --- KONFETTI ENDE ---
+        }
+
+        function closeModal() {
+            document.getElementById('rouletteModal').classList.add('hidden');
+            document.getElementById('rouletteImage').classList.remove('animate-pop');
+        }
+    </script>
+</body>
+</html>

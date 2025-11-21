@@ -1,0 +1,16 @@
+# Geheime Keys
+.env
+
+# Datenbank & Daten
+data/
+*.db
+*.sqlite
+
+# Python Müll
+__pycache__/
+*.pyc
+.venv/
+env/
+
+# Docker Müll (falls vorhanden)
+.docker/
