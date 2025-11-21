@@ -35,31 +35,69 @@
         </div>
     </div>
 
-    <div class="p-4 max-w-4xl mx-auto">
-        {% if not movies %}
-            <div class="text-center text-gray-500 mt-10">
-                <i class="fas fa-film text-4xl mb-2"></i>
-                <p>Noch keine Filme auf der Liste.</p>
+   <div class="p-4 max-w-6xl mx-auto">
+        <h2 class="text-2xl font-bold text-yellow-500 mb-4 border-b border-gray-700 pb-2">
+            <i class="fas fa-popcorn mr-2"></i>Warteschlange
+        </h2>
+        
+        {% if not watchlist %}
+            <div class="text-center text-gray-500 py-10 bg-gray-800/50 rounded-xl">
+                <p>Alles gesehen! Zeit für Nachschub.</p>
             </div>
         {% endif %}
 
-        <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4" id="movieGrid">
-            {% for movie in movies %}
-            <div class="relative group poster-card bg-gray-800 rounded-xl overflow-hidden shadow-lg" data-title="{{ movie.title }}" data-poster="{{ movie.poster_path }}">
-                <img src="{{ movie.poster_path }}" class="w-full h-auto object-cover aspect-[2/3]" alt="{{ movie.title }}">
+        <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
+            {% for movie in watchlist %}
+            <div class="relative group poster-card bg-gray-800 rounded-xl overflow-hidden shadow-lg">
+                <img src="{{ movie.poster_path }}" class="w-full h-auto object-cover aspect-[2/3]">
                 
-                <form action="/delete/{{ movie.id }}" method="post" class="absolute top-0 right-0 p-1 opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button type="submit" class="bg-red-600 text-white w-8 h-8 rounded-full flex items-center justify-center shadow-md hover:bg-red-700">
-                        <i class="fas fa-times"></i>
-                    </button>
-                </form>
-                <div class="p-2 text-xs text-center truncate bg-gray-800">{{ movie.title }}</div>
+                <div class="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-3">
+                    
+                    <form action="/toggle_watched/{{ movie.id }}" method="post">
+                        <button type="submit" class="bg-green-600 text-white w-12 h-12 rounded-full flex items-center justify-center shadow hover:bg-green-500 transform hover:scale-110 transition">
+                            <i class="fas fa-check text-xl"></i>
+                        </button>
+                    </form>
+
+                    <form action="/delete/{{ movie.id }}" method="post">
+                        <button type="submit" class="bg-red-600 text-white w-12 h-12 rounded-full flex items-center justify-center shadow hover:bg-red-500 transform hover:scale-110 transition">
+                            <i class="fas fa-trash text-xl"></i>
+                        </button>
+                    </form>
+                </div>
             </div>
             {% endfor %}
         </div>
     </div>
 
-    {% if movies %}
+    <div class="p-4 max-w-6xl mx-auto mt-8 opacity-75">
+        <h2 class="text-xl font-bold text-gray-400 mb-4 border-b border-gray-700 pb-2">
+            <i class="fas fa-history mr-2"></i>Bereits gesehen
+        </h2>
+
+        <div class="grid grid-cols-3 md:grid-cols-6 lg:grid-cols-8 gap-3">
+            {% for movie in seen_list %}
+            <div class="relative group poster-card bg-gray-800 rounded-lg overflow-hidden grayscale hover:grayscale-0 transition duration-500">
+                <img src="{{ movie.poster_path }}" class="w-full h-auto object-cover aspect-[2/3]">
+                
+                <div class="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                    <form action="/toggle_watched/{{ movie.id }}" method="post">
+                        <button type="submit" class="bg-yellow-500 text-black w-10 h-10 rounded-full flex items-center justify-center shadow hover:bg-yellow-400" title="Nochmal schauen">
+                            <i class="fas fa-undo"></i>
+                        </button>
+                    </form>
+                    <form action="/delete/{{ movie.id }}" method="post">
+                        <button type="submit" class="bg-red-900 text-white w-10 h-10 rounded-full flex items-center justify-center shadow hover:bg-red-700">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </form>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    {% if watchlist %}
     <button onclick="startRoulette()" class="fixed bottom-6 right-6 bg-yellow-500 text-gray-900 w-16 h-16 rounded-full shadow-2xl flex items-center justify-center text-2xl hover:scale-110 transition-transform z-30">
         <i class="fas fa-dice"></i>
     </button>
@@ -127,7 +165,7 @@
 
         // --- Roulette Animation Logik ---
         const moviesData = [
-            {% for movie in movies %}
+            {% for movie in watchlist %}
             { title: "{{ movie.title }}", poster: "{{ movie.poster_path }}" },
             {% endfor %}
         ];

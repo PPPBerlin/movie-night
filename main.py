@@ -25,22 +25,45 @@ def init_db():
     conn.commit()
     conn.close()
 
-init_db()
+def upgrade_db():
+    """Fügt die watched Spalte hinzu, falls sie fehlt"""
+    conn = get_db_connection()
+    try:
+        # Versuchen, die Spalte hinzuzufügen
+        conn.execute('ALTER TABLE movies ADD COLUMN watched INTEGER DEFAULT 0')
+        conn.commit()
+        print("Datenbank wurde geupgradet: Spalte 'watched' hinzugefügt.")
+    except sqlite3.OperationalError:
+        # Fehler bedeutet meist: Spalte existiert schon -> alles gut
+        pass
+    conn.close()
 
-# --- Hilfsfunktionen ---
 def get_db_connection():
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     return conn
+
+init_db()
+upgrade_db()
 
 # --- Routen ---
 
 @app.get("/")
 async def home(request: Request):
     conn = get_db_connection()
-    movies = conn.execute('SELECT * FROM movies ORDER BY id DESC').fetchall()
+    # Alle Filme holen
+    all_movies = conn.execute('SELECT * FROM movies ORDER BY id DESC').fetchall()
     conn.close()
-    return templates.TemplateResponse("index.html", {"request": request, "movies": movies})
+
+    # In zwei Listen aufteilen
+    watchlist = [m for m in all_movies if m['watched'] == 0]
+    seen_list = [m for m in all_movies if m['watched'] == 1]
+
+    return templates.TemplateResponse("index.html", {
+        "request": request,
+        "watchlist": watchlist,
+        "seen_list": seen_list
+    })
 
 @app.get("/api/search")
 async def search_tmdb(query: str):
@@ -81,5 +104,17 @@ async def delete_movie(movie_id: int):
     conn = get_db_connection()
     conn.execute('DELETE FROM movies WHERE id = ?', (movie_id,))
     conn.commit()
+    conn.close()
+    return RedirectResponse(url="/", status_code=303)
+
+@app.post("/toggle_watched/{movie_id}")
+async def toggle_watched(movie_id: int):
+    conn = get_db_connection()
+    # Aktuellen Status holen
+    row = conn.execute('SELECT watched FROM movies WHERE id = ?', (movie_id,)).fetchone()
+    if row:
+        new_status = 0 if row['watched'] == 1 else 1
+        conn.execute('UPDATE movies SET watched = ? WHERE id = ?', (new_status, movie_id))
+        conn.commit()
     conn.close()
     return RedirectResponse(url="/", status_code=303)
